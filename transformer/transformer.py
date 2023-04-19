@@ -55,6 +55,8 @@ def create_vit_classifier(input_shape=(520, 704, 1), number_of_transformer_block
     # augmented = data_augmentation(inputs)
     
     # Create patches (downsampling)
+    # TODO: replace with patchify + linear into transformer
+    # (yields seq of patch embeddings)
     encoded_patches = layers.Conv2D(2, 2, strides=2, padding="same", activation='relu')(inputs)
     encoded_patches = layers.Conv2D(2, 2, strides=2, padding="same", activation='relu')(encoded_patches)
     encoded_patches = layers.Conv2D(2, 2, strides=2, padding="same", activation='relu')(encoded_patches)
@@ -82,13 +84,25 @@ def create_vit_classifier(input_shape=(520, 704, 1), number_of_transformer_block
         # encoded_patches = layers.Add()([x3, x2])
 
     # Upsampling
-    encoded_patches = layers.UpSampling2D(2)(encoded_patches)
-    encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
-    encoded_patches = layers.UpSampling2D(2)(encoded_patches)
-    encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
-    encoded_patches = layers.UpSampling2D(2)(encoded_patches)
-    encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
-    encoded_patches = layers.UpSampling2D(2)(encoded_patches)
+    # encoded_patches = layers.UpSampling2D(2)(encoded_patches)
+    # encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
+    # encoded_patches = layers.UpSampling2D(2)(encoded_patches)
+    # encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
+    # encoded_patches = layers.UpSampling2D(2)(encoded_patches)
+    # encoded_patches = layers.Conv2D(2, 4,padding="same", activation='relu')(encoded_patches)
+    # encoded_patches = layers.UpSampling2D(2)(encoded_patches)
+
+    # Deconvolution
+    encoded_patches = layers.Conv2DTranspose(filters=2, kernel_size=2, strides=(1, 1), 
+                                            padding="same", activation='relu')(encoded_patches)
+    encoded_patches = layers.Conv2DTranspose(filters=2, kernel_size=2, strides=(1, 1), 
+                                            padding="same", activation='relu')(encoded_patches)
+    encoded_patches = layers.Conv2DTranspose(filters=2, kernel_size=2, strides=(1, 1), 
+                                            padding="same", activation='relu')(encoded_patches)
+    encoded_patches = layers.Conv2DTranspose(filters=2, kernel_size=2, strides=(1, 1), 
+                                            padding="same", activation='relu')(encoded_patches)
+
+    # resize
     encoded_patches = tf.keras.layers.Resizing(520, 704, interpolation="bilinear", crop_to_aspect_ratio=False)(encoded_patches)
 
     # Output
@@ -117,9 +131,10 @@ def train_model(dataset_path, weights_path, log_path, config: TrainConfig, bool_
     validation_data = CellDataset(dataset_path + "train/", num_images=570, batch_size=config.batch_size)
 
     # compile model
-    model.compile(optimizer="rmsprop", loss="mean_squared_error")
-    # model.compile(optimizer=keras.optimizers.Adam(learning_rate=config.learning_rate),
-                #   loss=keras.losses.BinaryCrossentropy(from_logits=True))
+    # model.compile(optimizer="rmsprop", loss="mean_squared_error")
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=config.learning_rate),
+                # loss="mean_squared_error")
+                  loss=keras.losses.BinaryCrossentropy())
 
     callbacks = [
         keras.callbacks.ModelCheckpoint(weights_path, save_best_only=True),
@@ -144,7 +159,7 @@ if __name__ == '__main__':
     
     # load data
     dataset_path = "/nethome/mlamsey3/Documents/Coursework/cs7643-project/dataset/"
-    weights_path = "/nethome/mlamsey3/Documents/Coursework/cs7643-project/weights/"
+    weights_path = "/nethome/mlamsey3/Documents/Coursework/cs7643-project/weights/deconv/"
     log_path = "/nethome/mlamsey3/Documents/Coursework/cs7643-project/logs/fit/"
 
     config_string = f"batch_size={config.batch_size}_lr={config.learning_rate}_epochs={config.n_epochs}_transformer_blocks={config.n_transformer_blocks}"
@@ -157,16 +172,18 @@ if __name__ == '__main__':
         os.makedirs(weights_path)
 
     # toggle whether to train
-    # if False:        
-    #     model = train_model(dataset_path, weights_path, log_path, config, bool_tensorboard=True)
+    if True:        
+        model = train_model(dataset_path, weights_path, log_path, config, bool_tensorboard=True)
     model = keras.models.load_model(weights_path)
     validation_preds = model.predict(validation_data)
 
+    plt.figure()
+    plt.subplot(1, 2, 1)
     input, actual = validation_data[0]
     plt.imshow(actual[2]*255, cmap='gray', vmin=0, vmax=255)
     plt.title("Actual")
-    plt.show()
 
+    plt.subplot(1, 2, 2)
     temp = validation_preds[2]
     temp[temp >= 0.5] = 1
     temp[temp < 0.5] = 0
@@ -175,10 +192,12 @@ if __name__ == '__main__':
     plt.title("Predicted")
     plt.show()
 
+    plt.figure()
+    plt.subplot(1, 2, 1)
     plt.imshow(actual[3]*255, cmap='gray', vmin=0, vmax=255)
     plt.title("Actual")
-    plt.show()
 
+    plt.subplot(1, 2, 2)
     temp = validation_preds[3]
     temp[temp >= 0.5] = 1
     temp[temp < 0.5] = 0
