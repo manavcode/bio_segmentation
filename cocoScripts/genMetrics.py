@@ -5,8 +5,11 @@ from pycocotools.cocoeval import COCOeval
 import numpy as np
 
 # Load the ground truth annotations and predicted results in COCO format
-coco_gt = COCO('/path/to/groundTruch/testImgs.json')
-coco_results = COCO('/path/to/segResult.json')
+# coco_gt = COCO('/path/to/groundTruch/testImgs.json')
+# coco_results = COCO('/path/to/segResult.json')
+
+coco_gt = COCO("/nethome/mlamsey3/Documents/Coursework/cs7643-project/data/A172/train.json")
+coco_results = COCO("/nethome/mlamsey3/Documents/Coursework/cs7643-project/detectron2/new_coco.json")
 
 # Initialize COCO evaluation object for instance segmentation
 coco_eval = COCOeval(coco_gt, coco_results, 'segm')
